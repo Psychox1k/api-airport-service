@@ -19,9 +19,7 @@ class Airplane(models.Model):
     seats_in_row = models.PositiveSmallIntegerField(validators=[MinValueValidator(1)])
 
     airplane_type = models.ForeignKey(
-        AirplaneType,
-        on_delete=models.PROTECT,
-        related_name="airplanes"
+        AirplaneType, on_delete=models.PROTECT, related_name="airplanes"
     )
 
     @property
@@ -42,14 +40,10 @@ class Airport(models.Model):
 
 class Route(models.Model):
     source = models.ForeignKey(
-        Airport,
-        on_delete=models.PROTECT,
-        related_name="routes_from"
+        Airport, on_delete=models.PROTECT, related_name="routes_from"
     )
     destination = models.ForeignKey(
-        Airport,
-        on_delete=models.PROTECT,
-        related_name="routes_to"
+        Airport, on_delete=models.PROTECT, related_name="routes_to"
     )
     distance = models.PositiveIntegerField(validators=[MinValueValidator(1)])
 
@@ -66,15 +60,9 @@ class Crew(models.Model):
 
 
 class Flight(models.Model):
-    route = models.ForeignKey(
-        Route,
-        on_delete=models.PROTECT,
-        related_name="flights"
-    )
+    route = models.ForeignKey(Route, on_delete=models.PROTECT, related_name="flights")
     airplane = models.ForeignKey(
-        Airplane,
-        on_delete=models.PROTECT,
-        related_name="flights"
+        Airplane, on_delete=models.PROTECT, related_name="flights"
     )
     departure_time = models.DateTimeField()
     arrival_time = models.DateTimeField()
@@ -97,9 +85,7 @@ class Flight(models.Model):
 class Order(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     user = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        related_name="orders"
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="orders"
     )
 
     def __str__(self):
@@ -112,16 +98,8 @@ class Order(models.Model):
 class Ticket(models.Model):
     row = models.PositiveSmallIntegerField(validators=[MinValueValidator(1)])
     seat = models.PositiveSmallIntegerField(validators=[MinValueValidator(1)])
-    flight = models.ForeignKey(
-        Flight,
-        on_delete=models.CASCADE,
-        related_name="tickets"
-    )
-    order = models.ForeignKey(
-        Order,
-        on_delete=models.CASCADE,
-        related_name="tickets"
-    )
+    flight = models.ForeignKey(Flight, on_delete=models.CASCADE, related_name="tickets")
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="tickets")
 
     def __str__(self):
         return f"{self.flight} row:{self.row}, seat:{self.seat}"
