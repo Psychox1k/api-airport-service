@@ -101,9 +101,46 @@ class Ticket(models.Model):
     flight = models.ForeignKey(Flight, on_delete=models.CASCADE, related_name="tickets")
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name="tickets")
 
+    @staticmethod
+    def validate_ticket(row, seat, airplane, error_to_raise):
+        for value, field, max_field in [
+            (row, "row", "rows"),
+            (seat, "seat", "seats_in_row"),
+        ]:
+            limit = getattr(airplane, max_field)
+            if not (1 <= value <= limit):
+                raise error_to_raise({
+                    field: f"{field} must be within 1..{limit}"
+                })
+
+    def clean(self):
+        if not self.flight_id:
+            return
+        Ticket.validate_ticket(
+            self.row,
+            self.seat,
+            self.flight.airplane,
+            ValidationError
+        )
+
+    def save(
+        self,
+        *args,
+        force_insert=False,
+        force_update=False,
+        using=None,
+        update_fields=None,
+    ):
+        self.full_clean()
+        return super(Ticket, self).save(
+            force_insert, force_update, using, update_fields
+        )
+
     def __str__(self):
         return f"{self.flight} row:{self.row}, seat:{self.seat}"
 
     class Meta:
         unique_together = ("flight", "row", "seat")
         ordering = ["row", "seat"]
+
+

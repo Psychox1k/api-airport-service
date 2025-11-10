@@ -56,6 +56,21 @@ class OrderSerializer(serializers.ModelSerializer):
 
 
 class TicketSerializer(serializers.ModelSerializer):
+    def validate(self, attrs):
+        data = super().validate(attrs)
+        row = attrs.get("row")
+        seat = attrs.get("seat")
+        flight = attrs.get("flight")
+
+        if row is not None and seat is not None and flight is not None:
+            Ticket.validate_ticket(
+                row,
+                seat,
+                flight.airplane,
+                ValidationError
+            )
+        return data
+
     class Meta:
         model = Ticket
         fields = ("id", "row", "seat", "flight", "order")
