@@ -43,6 +43,17 @@ class RouteSerializer(serializers.ModelSerializer):
         model = Route
         fields = ("id", "source", "destination", "distance")
 
+    def validate(self, attrs):
+        source = attrs.get("source")
+        destination = attrs.get("destination")
+
+        if source == destination:
+            raise serializers.ValidationError(
+                {"source": "Source and destination can't be the same"}
+            )
+
+        return attrs
+
 
 class CrewSerializer(serializers.ModelSerializer):
     class Meta:
@@ -62,9 +73,32 @@ class FlightSerializer(serializers.ModelSerializer):
             "crew"
         )
 
-# class FlightListSerializer(serializers.ModelSerializer):
-#     class Meta:
-#         field
+
+class FlightListSerializer(serializers.ModelSerializer):
+
+    airplane_capacity = serializers.IntegerField(
+        source="airplane.capacity", read_only=True
+    )
+    airport_name = serializers.CharField(
+        source="airport.name", read_only=True
+    )
+    airplane_name = serializers.CharField(
+        source="airplane.name", read_only=True
+    )
+
+    tickets_available = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        fields = (
+            "id",
+            "route",
+            "departure_time",
+            "airport_name"
+            "airplane_name",
+            "airplane_capacity"
+            "arrival_time",
+            "tickets_available"
+        )
 
 
 

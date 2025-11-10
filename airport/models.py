@@ -40,12 +40,22 @@ class Airport(models.Model):
 
 class Route(models.Model):
     source = models.ForeignKey(
-        Airport, on_delete=models.PROTECT, related_name="routes_from"
+        Airport,
+        on_delete=models.PROTECT,
+        related_name="routes_from"
     )
     destination = models.ForeignKey(
-        Airport, on_delete=models.PROTECT, related_name="routes_to"
+        Airport,
+        on_delete=models.PROTECT,
+        related_name="routes_to",
     )
     distance = models.PositiveIntegerField(validators=[MinValueValidator(1)])
+
+    def clean(self):
+        if self.source == self.destination:
+            raise ValidationError("It can't be a route with the same source and destination")
+        if self.distance > 20000:
+            raise ValidationError("Route distance cannot exceed 20,000 km.")
 
     def __str__(self):
         return f"{self.source} → {self.destination}"
@@ -64,9 +74,19 @@ class Crew(models.Model):
 
 
 class Flight(models.Model):
-    route = models.ForeignKey(Route, on_delete=models.PROTECT, related_name="flights")
+    route = models.ForeignKey(
+        Route,
+        on_delete=models.PROTECT,
+        related_name="flights",
+        blank=False,
+        null=False
+    )
     airplane = models.ForeignKey(
-        Airplane, on_delete=models.PROTECT, related_name="flights"
+        Airplane,
+        on_delete=models.PROTECT,
+        related_name="flights",
+        blank=False,
+        null=False
     )
     departure_time = models.DateTimeField()
     arrival_time = models.DateTimeField()
@@ -77,6 +97,19 @@ class Flight(models.Model):
         return f"{self.route} @ {self.departure_time:%Y-%m-%d %H:%M}"
 
     def clean(self):
+
+        overlapping_flight = Flight.objects.filter(
+            airplane=self.airplane
+        ).exclude(id=self.id)
+
+        for flight in overlapping_flight:
+            if (
+                    self.departure_time < flight.arrival_time and
+                    self.arrival_time > flight.departure_time):
+                raise ValidationError(
+                    f"Flight times overlap with an existing flight: {flight}"
+                )
+
         if self.departure_time >= self.arrival_time:
             raise ValidationError("Departure time must be before arrival time")
         if self.departure_time < timezone.now():
@@ -118,8 +151,17 @@ class Ticket(models.Model):
                 })
 
     def clean(self):
+
         if not self.flight_id:
             return
+
+        if Ticket.objects.filter(
+            flight=self.flight,
+            row=self.row,
+            seat=self.seat
+        ).exists():
+            raise ValidationError("This seat is already booked on the selected flight.")
+
         Ticket.validate_ticket(
             self.row,
             self.seat,
