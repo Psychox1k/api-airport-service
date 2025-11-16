@@ -98,17 +98,16 @@ class Flight(models.Model):
 
     def clean(self):
 
-        overlapping_flight = Flight.objects.filter(
-            airplane=self.airplane
+        overlapping = Flight.objects.filter(
+            airplane=self.airplane,
+            departure_time__lt=self.arrival_time,
+            arrival_time__gt=self.departure_time
         ).exclude(id=self.id)
 
-        for flight in overlapping_flight:
-            if (
-                    self.departure_time < flight.arrival_time and
-                    self.arrival_time > flight.departure_time):
-                raise ValidationError(
-                    f"Flight times overlap with an existing flight: {flight}"
-                )
+        if overlapping.exists():
+            raise ValidationError(
+                f"Flight times overlap with existing flight: {overlapping.first()}"
+            )
 
         if self.departure_time >= self.arrival_time:
             raise ValidationError("Departure time must be before arrival time")
@@ -122,7 +121,9 @@ class Flight(models.Model):
 class Order(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     user = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="orders"
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="orders"
     )
 
     def __str__(self):
