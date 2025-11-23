@@ -260,4 +260,4 @@ class OrderSerializer(serializers.ModelSerializer):
 
 
 class OrderListSerializer(OrderSerializer):
-    tickets = TicketSerializer(many=True, read_only=True)
+    tickets = TicketListSerializer(many=True, read_only=True)
