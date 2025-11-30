@@ -1,8 +1,8 @@
 from datetime import datetime
 
 from django.db.models import F, Count, Prefetch, Q
-from django.shortcuts import render
-from rest_framework import viewsets
+from rest_framework import viewsets, mixins
+from rest_framework.permissions import IsAuthenticated
 
 from airport.models import (
     Flight,
@@ -14,6 +14,7 @@ from airport.models import (
     Ticket,
     Airplane,
 )
+from airport.permissions import IsAdminOrIfAuthenticatedReadOnly
 from airport.serializers import (
     FlightSerializer,
     AirportSerializer,
@@ -34,9 +35,14 @@ from airport.serializers import (
 )
 
 
-class AirplaneTypeViewSet(viewsets.ModelViewSet):
+class AirplaneTypeViewSet(
+    mixins.ListModelMixin,
+    mixins.CreateModelMixin,
+    viewsets.GenericViewSet,
+):
     queryset = AirplaneType.objects.all()
     serializer_class = AirplaneTypeSerializer
+    permission_classes = (IsAdminOrIfAuthenticatedReadOnly,)
 
     def get_queryset(self):
         type_name = self.request.query_params.get("type_name")
@@ -53,11 +59,17 @@ class AirplaneTypeViewSet(viewsets.ModelViewSet):
         return queryset
 
 
-class AirplaneViewSet(viewsets.ModelViewSet):
+class AirplaneViewSet(
+    mixins.ListModelMixin,
+    mixins.CreateModelMixin,
+    mixins.RetrieveModelMixin,
+    viewsets.GenericViewSet,
+):
     queryset = Airplane.objects.all().select_related(
         "airplane_type"
     )
     serializer_class = AirplaneSerializer
+    permission_classes = (IsAdminOrIfAuthenticatedReadOnly,)
 
     def get_queryset(self):
         queryset = self.queryset
@@ -76,8 +88,6 @@ class AirplaneViewSet(viewsets.ModelViewSet):
         if airplane_name:
             queryset = queryset.filter(name__icontains=airplane_name)
 
-
-
         if self.action == "retrieve":
             queryset = queryset.prefetch_related(
                 Prefetch(
@@ -89,7 +99,7 @@ class AirplaneViewSet(viewsets.ModelViewSet):
                 )
             )
 
-        return queryset.distinct()
+        return queryset
 
     def get_serializer_class(self):
         if self.action == "list":
@@ -99,7 +109,9 @@ class AirplaneViewSet(viewsets.ModelViewSet):
         return AirplaneSerializer
 
 
-class FlightViewSet(viewsets.ModelViewSet):
+class FlightViewSet(
+    viewsets.ModelViewSet
+):
     queryset = Flight.objects.all().select_related(
         "route__source",
         "route__destination",
@@ -111,6 +123,7 @@ class FlightViewSet(viewsets.ModelViewSet):
             )
         )
     serializer_class = FlightSerializer
+    permission_classes = (IsAdminOrIfAuthenticatedReadOnly,)
 
     def get_queryset(self):
 
@@ -127,7 +140,7 @@ class FlightViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(id=flight_id)
 
         if airplane_id:
-            queryset = queryset.filter(airplane_id=airplane_id)
+            queryset = queryset.filter(airplane_id=int(airplane_id))
 
         if arrival_time:
             date_obj = datetime.strptime(arrival_time, "%Y-%m-%d").date()
@@ -160,9 +173,15 @@ class FlightViewSet(viewsets.ModelViewSet):
         return FlightSerializer
 
 
-class AirportViewSet(viewsets.ModelViewSet):
+class AirportViewSet(
+    mixins.ListModelMixin,
+    mixins.RetrieveModelMixin,
+    mixins.CreateModelMixin,
+    viewsets.GenericViewSet
+):
     queryset = Airport.objects.all()
     serializer_class = AirportSerializer
+    permission_classes = (IsAdminOrIfAuthenticatedReadOnly,)
 
     def get_queryset(self):
         airport_name = self.request.query_params.get("name")
@@ -211,6 +230,7 @@ class RouteViewSet(viewsets.ModelViewSet):
     )
 
     serializer_class = RouteSerializer
+    permission_classes = (IsAdminOrIfAuthenticatedReadOnly,)
 
     def get_queryset(self):
 
@@ -230,6 +250,7 @@ class RouteViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(distance__lte=int(distance_max))
 
         return queryset
+
     def get_serializer_class(self):
         if self.action == "list":
             return RouteListSerializer
@@ -238,9 +259,14 @@ class RouteViewSet(viewsets.ModelViewSet):
         return RouteSerializer
 
 
-class CrewViewSet(viewsets.ModelViewSet):
+class CrewViewSet(
+    mixins.ListModelMixin,
+    mixins.CreateModelMixin,
+    viewsets.GenericViewSet
+):
     queryset = Crew.objects.all()
     serializer_class = CrewSerializer
+    permission_classes = (IsAdminOrIfAuthenticatedReadOnly,)
 
     def get_queryset(self):
 
@@ -261,13 +287,18 @@ class CrewViewSet(viewsets.ModelViewSet):
         return queryset
 
 
-class OrderViewSet(viewsets.ModelViewSet):
+class OrderViewSet(
+    mixins.ListModelMixin,
+    mixins.CreateModelMixin,
+    viewsets.GenericViewSet,
+):
     queryset = Order.objects.prefetch_related(
         "tickets__flight__route__source",
         "tickets__flight__route__destination",
         "tickets__flight__airplane__airplane_type"
     )
     serializer_class = OrderSerializer
+    permission_classes = (IsAuthenticated,)
 
     def get_queryset(self):
         return (
