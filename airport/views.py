@@ -1,6 +1,8 @@
 from datetime import datetime
 
 from django.db.models import F, Count, Prefetch, Q
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import OpenApiParameter, extend_schema, extend_schema_view
 from rest_framework import viewsets, mixins
 from rest_framework.permissions import IsAuthenticated
 
@@ -31,10 +33,22 @@ from airport.serializers import (
     RouteListSerializer,
     RouteDetailSerializer,
     AirplaneListSerializer,
-    AirplaneDetailSerializer, TicketListSerializer,
+    AirplaneDetailSerializer,
+    TicketListSerializer,
 )
 
 
+@extend_schema_view(
+    list=extend_schema(
+        parameters=[
+            OpenApiParameter(
+                "type_name",
+                type=OpenApiTypes.STR,
+                description="Filter by airplane type name (ex. ?type_name=Boeing)",
+            ),
+        ]
+    )
+)
 class AirplaneTypeViewSet(
     mixins.ListModelMixin,
     mixins.CreateModelMixin,
@@ -59,6 +73,22 @@ class AirplaneTypeViewSet(
         return queryset
 
 
+@extend_schema_view(
+    list=extend_schema(
+        parameters=[
+            OpenApiParameter(
+                "airplane_type",
+                type=OpenApiTypes.STR,
+                description="Filter by airplane type name (ex. ?airplane_type=Boeing)",
+            ),
+            OpenApiParameter(
+                "name",
+                type=OpenApiTypes.STR,
+                description="Filter by airplane name (ex. ?name=Mriya)",
+            ),
+        ]
+    )
+)
 class AirplaneViewSet(
     mixins.ListModelMixin,
     mixins.CreateModelMixin,
@@ -109,6 +139,37 @@ class AirplaneViewSet(
         return AirplaneSerializer
 
 
+@extend_schema_view(
+    list=extend_schema(
+        parameters=[
+            OpenApiParameter(
+                "airplane",
+                type=OpenApiTypes.INT,
+                description="Filter by airplane ID (ex. ?airplane=1)",
+            ),
+            OpenApiParameter(
+                "arrival_time",
+                type=OpenApiTypes.DATE,
+                description="Filter by arrival date (ex. ?arrival_time=2024-10-25)",
+            ),
+            OpenApiParameter(
+                "departure_time",
+                type=OpenApiTypes.DATE,
+                description="Filter by departure date (ex. ?departure_time=2024-10-25)",
+            ),
+            OpenApiParameter(
+                "source",
+                type=OpenApiTypes.STR,
+                description="Filter by source airport name (ex. ?source=Kyiv)",
+            ),
+            OpenApiParameter(
+                "destination",
+                type=OpenApiTypes.STR,
+                description="Filter by destination airport name (ex. ?destination=Paris)",
+            ),
+        ]
+    )
+)
 class FlightViewSet(
     viewsets.ModelViewSet
 ):
@@ -173,6 +234,22 @@ class FlightViewSet(
         return FlightSerializer
 
 
+@extend_schema_view(
+    list=extend_schema(
+        parameters=[
+            OpenApiParameter(
+                "name",
+                type=OpenApiTypes.STR,
+                description="Filter by airport name (ex. ?name=Heathrow)",
+            ),
+            OpenApiParameter(
+                "city",
+                type=OpenApiTypes.STR,
+                description="Filter by closest big city (ex. ?city=London)",
+            ),
+        ]
+    )
+)
 class AirportViewSet(
     mixins.ListModelMixin,
     mixins.RetrieveModelMixin,
@@ -223,6 +300,22 @@ class AirportViewSet(
         return AirportSerializer
 
 
+@extend_schema_view(
+    list=extend_schema(
+        parameters=[
+            OpenApiParameter(
+                "distance_min",
+                type=OpenApiTypes.INT,
+                description="Filter by minimum distance (ex. ?distance_min=500)",
+            ),
+            OpenApiParameter(
+                "distance_max",
+                type=OpenApiTypes.INT,
+                description="Filter by maximum distance (ex. ?distance_max=2000)",
+            ),
+        ]
+    )
+)
 class RouteViewSet(viewsets.ModelViewSet):
     queryset = Route.objects.all().select_related(
         "source",
@@ -259,6 +352,17 @@ class RouteViewSet(viewsets.ModelViewSet):
         return RouteSerializer
 
 
+@extend_schema_view(
+    list=extend_schema(
+        parameters=[
+            OpenApiParameter(
+                "name",
+                type=OpenApiTypes.STR,
+                description="Filter by crew member name (first or last) (ex. ?name=John)",
+            ),
+        ]
+    )
+)
 class CrewViewSet(
     mixins.ListModelMixin,
     mixins.CreateModelMixin,
