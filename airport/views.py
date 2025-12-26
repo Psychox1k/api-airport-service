@@ -54,11 +54,19 @@ class AirplaneTypeViewSet(
     mixins.CreateModelMixin,
     viewsets.GenericViewSet,
 ):
+    """
+    ViewSet for managing Airplane Types.
+    Allows listing and creating types.
+    Restricted to Admin for creation; Read-only for authenticated users.
+    """
     queryset = AirplaneType.objects.all()
     serializer_class = AirplaneTypeSerializer
     permission_classes = (IsAdminOrIfAuthenticatedReadOnly,)
 
     def get_queryset(self):
+        """
+        Filters airplane types by name or ID.
+        """
         type_name = self.request.query_params.get("type_name")
         type_id = self.request.query_params.get("id")
 
@@ -95,6 +103,11 @@ class AirplaneViewSet(
     mixins.RetrieveModelMixin,
     viewsets.GenericViewSet,
 ):
+    """
+    ViewSet for Airplanes.
+    Optimized to fetch related 'AirplaneType' to prevent N+1 queries.
+    """
+    # Use select_related because 'airplane_type' is a ForeignKey (One-to-Many)
     queryset = Airplane.objects.all().select_related(
         "airplane_type"
     )
@@ -102,6 +115,9 @@ class AirplaneViewSet(
     permission_classes = (IsAdminOrIfAuthenticatedReadOnly,)
 
     def get_queryset(self):
+        """
+        Applies filters and conditional prefetching for detailed views.
+        """
         queryset = self.queryset
 
         airplanes_type = self.request.query_params.get("airplane_type")
@@ -118,6 +134,8 @@ class AirplaneViewSet(
         if airplane_name:
             queryset = queryset.filter(name__icontains=airplane_name)
 
+        # Optimization: Only load full flight history when viewing a single airplane (Retrieve)
+        # This prevents loading huge amounts of data for simple list views.
         if self.action == "retrieve":
             queryset = queryset.prefetch_related(
                 Prefetch(
@@ -173,11 +191,18 @@ class AirplaneViewSet(
 class FlightViewSet(
     viewsets.ModelViewSet
 ):
+    """
+    ViewSet for Flights.
+    Contains complex logic for calculating available tickets on the DB level.
+    """
+    # We join Routes, Airports, and Airplane details to the initial query.
     queryset = Flight.objects.all().select_related(
         "route__source",
         "route__destination",
         "airplane__airplane_type",
     ).annotate(
+            # Calculate available tickets dynamically using F expressions.
+            # Logic: (Rows * Seats_per_row) - (Count of sold tickets)
             tickets_available=(
                 F("airplane__rows") * F("airplane__seats_in_row")
                 - Count("tickets")
@@ -187,7 +212,9 @@ class FlightViewSet(
     permission_classes = (IsAdminOrIfAuthenticatedReadOnly,)
 
     def get_queryset(self):
-
+        """
+        Extensive filtering capabilities for flight search.
+        """
         flight_id = self.request.query_params.get("id")
         airplane_id = self.request.query_params.get("airplane")
         arrival_time = self.request.query_params.get("arrival_time")
@@ -218,7 +245,8 @@ class FlightViewSet(
             queryset = queryset.filter(route__destination__name__icontains=dest_name)
 
 
-
+        # When viewing details, we also need to know exactly WHICH tickets are taken
+        # and who the crew is. We prefetch this to avoid N+1 queries.
         if self.action == "retrieve":
             queryset = queryset.prefetch_related(
                 Prefetch('tickets', queryset=Ticket.objects.select_related('order')),
@@ -256,6 +284,9 @@ class AirportViewSet(
     mixins.CreateModelMixin,
     viewsets.GenericViewSet
 ):
+    """
+    ViewSet for Airports.
+    """
     queryset = Airport.objects.all()
     serializer_class = AirportSerializer
     permission_classes = (IsAdminOrIfAuthenticatedReadOnly,)
@@ -276,8 +307,10 @@ class AirportViewSet(
         if city:
             queryset = queryset.filter(closest_big_city__icontains=city)
 
+        # In retrieve view, we show ALL flights connected to this airport.
+        # This requires complex prefetching to get flight details (airplanes)
+        # without killing the database.
         if self.action == "retrieve":
-
             queryset = queryset.prefetch_related(
                 "routes_from__destination",
                 "routes_to__source",
@@ -294,7 +327,6 @@ class AirportViewSet(
         return queryset
 
     def get_serializer_class(self):
-
         if self.action == "retrieve":
             return AirportDetailSerializer
         return AirportSerializer
@@ -317,6 +349,10 @@ class AirportViewSet(
     )
 )
 class RouteViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for Routes between airports.
+    """
+    # Always load source and destination airports to show names, not just IDs.
     queryset = Route.objects.all().select_related(
         "source",
         "destination"
@@ -326,7 +362,6 @@ class RouteViewSet(viewsets.ModelViewSet):
     permission_classes = (IsAdminOrIfAuthenticatedReadOnly,)
 
     def get_queryset(self):
-
         route_id = self.request.query_params.get("id")
         distance_min = self.request.query_params.get("distance_min")
         distance_max = self.request.query_params.get("distance_max")
@@ -373,13 +408,13 @@ class CrewViewSet(
     permission_classes = (IsAdminOrIfAuthenticatedReadOnly,)
 
     def get_queryset(self):
-
         full_name = self.request.query_params.get("name")
         crew_id = self.request.query_params.get("id")
 
         queryset = self.queryset
 
         if full_name:
+            # Filter by First Name OR Last Name
             queryset = queryset.filter(
                 Q(first_name__icontains=full_name)
                 | Q(last_name__icontains=full_name)
@@ -396,6 +431,11 @@ class OrderViewSet(
     mixins.CreateModelMixin,
     viewsets.GenericViewSet,
 ):
+    """
+    ViewSet for User Orders.
+    Ensures data privacy: Users can only access their own orders.
+    """
+    # Optimize query by fetching all nested ticket/flight info in one go
     queryset = Order.objects.prefetch_related(
         "tickets__flight__route__source",
         "tickets__flight__route__destination",
@@ -405,6 +445,9 @@ class OrderViewSet(
     permission_classes = (IsAuthenticated,)
 
     def get_queryset(self):
+        """
+        Override to strictly filter orders by the current authenticated user.
+        """
         return (
             self.queryset
             .filter(user=self.request.user)
@@ -416,4 +459,7 @@ class OrderViewSet(
         return OrderSerializer
 
     def perform_create(self, serializer):
+        """
+        Automatically assign the logged-in user to the order.
+        """
         serializer.save(user=self.request.user)
